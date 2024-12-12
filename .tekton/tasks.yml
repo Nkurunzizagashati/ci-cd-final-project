@@ -1,0 +1,77 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: cicd-pipeline
+spec:
+  params:
+    - name: IMAGE
+      type: string
+      description: The image name to build and deploy
+
+  tasks:
+    - name: lint
+      taskRef:
+        name: flake8-lint
+      resources: {}
+      params:
+        - name: PATH
+          value: "/workspace/source"
+
+    - name: test
+      taskRef:
+        name: pytest-test
+      resources: {}
+      params:
+        - name: TEST_DIRECTORY
+          value: "/workspace/source/tests"
+
+    - name: deploy
+      taskRef:
+        name: deploy-to-production
+      params:
+        - name: IMAGE
+          value: "$(params.IMAGE)"
+
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: flake8-lint
+spec:
+  steps:
+    - name: lint
+      image: python:3.x
+      script: |
+        #!/bin/bash
+        pip install flake8
+        flake8 $(resources.inputs.source.path)
+
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: pytest-test
+spec:
+  steps:
+    - name: test
+      image: python:3.x
+      script: |
+        #!/bin/bash
+        pip install -r /workspace/source/requirements.txt
+        pip install pytest
+        pytest --maxfail=1 --disable-warnings -q /workspace/source/tests
+
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: deploy-to-production
+spec:
+  steps:
+    - name: deploy
+      image: your-deploy-image
+      script: |
+        #!/bin/bash
+        echo "Deploying to production environment..."
+        # Add your deployment script/commands here
+        # Example: ssh user@hostname "cd /path/to/app && git pull && systemctl restart app"
